@@ -1,0 +1,365 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  client
+  tax_accountant
+  admin
+}
+
+enum ConsultationStatus {
+  pending
+  accepted
+  rejected
+  completed
+  cancelled
+}
+
+enum MessageStatus {
+  sent
+  delivered
+  read
+}
+
+enum PriceType {
+  monthly
+  annual
+  one_time
+  hourly
+}
+
+enum QuestionType {
+  single
+  multiple
+  scale
+  text
+}
+
+enum ContractStatus {
+  active
+  cancelled
+  completed
+}
+
+enum BillingType {
+  success_fee
+  monthly_fee
+}
+
+enum BillingStatus {
+  pending
+  paid
+  cancelled
+}
+
+// Models
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole  @default(client)
+  isVerified   Boolean   @default(false) @map("is_verified")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  profile            UserProfile?
+  taxAccountant      TaxAccountant?
+  diagnosisResults   AIDiagnosisResult[]
+  consultationsAsUser Consultation[] @relation("UserConsultations")
+  sentMessages       Message[]       @relation("SentMessages")
+  receivedMessages   Message[]       @relation("ReceivedMessages")
+  reviews            Review[]
+  contracts          Contract[]
+  notifications      Notification[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id             String    @id @default(uuid())
+  userId         String    @unique @map("user_id")
+  firstName      String?   @map("first_name")
+  lastName       String?   @map("last_name")
+  companyName    String?   @map("company_name")
+  phoneNumber    String?   @map("phone_number")
+  prefecture     String?
+  city           String?
+  address        String?
+  businessType   String?   @map("business_type")
+  annualRevenue  BigInt?   @map("annual_revenue")
+  employeeCount  Int?      @map("employee_count")
+  avatarUrl      String?   @map("avatar_url")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model TaxAccountant {
+  id                   String   @id @default(uuid())
+  userId               String   @unique @map("user_id")
+  licenseNumber        String   @unique @map("license_number")
+  officeName           String   @map("office_name")
+  yearsOfExperience    Int      @map("years_of_experience")
+  bio                  String?  @db.Text
+  specialtiesJson      Json?    @map("specialties")
+  certificationsJson   Json?    @map("certifications")
+  isAcceptingClients   Boolean  @default(true) @map("is_accepting_clients")
+  averageRating        Decimal? @map("average_rating") @db.Decimal(3, 2)
+  totalReviews         Int      @default(0) @map("total_reviews")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialties          TaxAccountantSpecialty[]
+  pricingPlans         PricingPlan[]
+  matchingResults      MatchingResult[]
+  consultations        Consultation[]            @relation("TaxAccountantConsultations")
+  reviews              Review[]
+  contracts            Contract[]
+  billingRecords       BillingRecord[]
+
+  @@map("tax_accountants")
+}
+
+model Specialty {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  category    String
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  taxAccountants TaxAccountantSpecialty[]
+
+  @@map("specialties")
+}
+
+model TaxAccountantSpecialty {
+  taxAccountantId   String   @map("tax_accountant_id")
+  specialtyId       String   @map("specialty_id")
+  yearsOfExperience Int?     @map("years_of_experience")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  taxAccountant TaxAccountant @relation(fields: [taxAccountantId], references: [id], onDelete: Cascade)
+  specialty     Specialty     @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([taxAccountantId, specialtyId])
+  @@map("tax_accountant_specialties")
+}
+
+model PricingPlan {
+  id              String    @id @default(uuid())
+  taxAccountantId String    @map("tax_accountant_id")
+  name            String
+  description     String?   @db.Text
+  priceType       PriceType @map("price_type")
+  basePrice       Int       @map("base_price")
+  featuresJson    Json?     @map("features")
+  isActive        Boolean   @default(true) @map("is_active")
+  displayOrder    Int       @default(0) @map("display_order")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  taxAccountant TaxAccountant @relation(fields: [taxAccountantId], references: [id], onDelete: Cascade)
+  contracts     Contract[]
+
+  @@map("pricing_plans")
+}
+
+model AIDiagnosisQuestion {
+  id           String       @id @default(uuid())
+  questionText String       @map("question_text") @db.Text
+  questionType QuestionType @map("question_type")
+  optionsJson  Json?        @map("options")
+  category     String
+  weight       Decimal      @db.Decimal(3, 2)
+  orderIndex   Int          @map("order_index")
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@map("ai_diagnosis_questions")
+}
+
+model AIDiagnosisResult {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  answersJson    Json      @map("answers")
+  preferencesJson Json?    @map("preferences")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matchingResults MatchingResult[]
+
+  @@map("ai_diagnosis_results")
+}
+
+model MatchingResult {
+  id                 String   @id @default(uuid())
+  diagnosisResultId  String   @map("diagnosis_result_id")
+  taxAccountantId    String   @map("tax_accountant_id")
+  matchingScore      Decimal  @map("matching_score") @db.Decimal(5, 2)
+  matchingReasonsJson Json?   @map("matching_reasons")
+  rank               Int
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  diagnosisResult AIDiagnosisResult @relation(fields: [diagnosisResultId], references: [id], onDelete: Cascade)
+  taxAccountant   TaxAccountant     @relation(fields: [taxAccountantId], references: [id], onDelete: Cascade)
+  consultations   Consultation[]
+
+  @@map("matching_results")
+}
+
+model Consultation {
+  id                String             @id @default(uuid())
+  userId            String             @map("user_id")
+  taxAccountantId   String             @map("tax_accountant_id")
+  matchingResultId  String?            @map("matching_result_id")
+  status            ConsultationStatus @default(pending)
+  initialMessage    String?            @map("initial_message") @db.Text
+  consultationDate  DateTime?          @map("consultation_date")
+  notes             String?            @db.Text
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  user           User            @relation("UserConsultations", fields: [userId], references: [id], onDelete: Cascade)
+  taxAccountant  TaxAccountant   @relation("TaxAccountantConsultations", fields: [taxAccountantId], references: [id], onDelete: Cascade)
+  matchingResult MatchingResult? @relation(fields: [matchingResultId], references: [id], onDelete: SetNull)
+  messages       Message[]
+  review         Review?
+  contract       Contract?
+
+  @@map("consultations")
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  consultationId String        @map("consultation_id")
+  senderId       String        @map("sender_id")
+  receiverId     String        @map("receiver_id")
+  content        String        @db.Text
+  attachmentsJson Json?        @map("attachments")
+  status         MessageStatus @default(sent)
+  readAt         DateTime?     @map("read_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver     User         @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([consultationId, createdAt])
+  @@map("messages")
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  taxAccountantId String   @map("tax_accountant_id")
+  consultationId  String   @unique @map("consultation_id")
+  rating          Int
+  title           String?
+  comment         String?  @db.Text
+  isVerified      Boolean  @default(false) @map("is_verified")
+  isVisible       Boolean  @default(true) @map("is_visible")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taxAccountant TaxAccountant @relation(fields: [taxAccountantId], references: [id], onDelete: Cascade)
+  consultation  Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  @@index([taxAccountantId, isVisible])
+  @@map("reviews")
+}
+
+model Contract {
+  id              String         @id @default(uuid())
+  consultationId  String         @unique @map("consultation_id")
+  userId          String         @map("user_id")
+  taxAccountantId String         @map("tax_accountant_id")
+  pricingPlanId   String         @map("pricing_plan_id")
+  status          ContractStatus @default(active)
+  startDate       DateTime       @map("start_date")
+  endDate         DateTime?      @map("end_date")
+  monthlyFee      Int            @map("monthly_fee")
+  notes           String?        @db.Text
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  consultation    Consultation    @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taxAccountant   TaxAccountant   @relation(fields: [taxAccountantId], references: [id], onDelete: Cascade)
+  pricingPlan     PricingPlan     @relation(fields: [pricingPlanId], references: [id])
+  billingRecords  BillingRecord[]
+
+  @@map("contracts")
+}
+
+model BillingRecord {
+  id              String        @id @default(uuid())
+  contractId      String        @map("contract_id")
+  taxAccountantId String        @map("tax_accountant_id")
+  billingType     BillingType   @map("billing_type")
+  amount          Int
+  feePercentage   Decimal?      @map("fee_percentage") @db.Decimal(5, 2)
+  status          BillingStatus @default(pending)
+  dueDate         DateTime      @map("due_date")
+  paidAt          DateTime?     @map("paid_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  contract      Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  taxAccountant TaxAccountant @relation(fields: [taxAccountantId], references: [id], onDelete: Cascade)
+
+  @@map("billing_records")
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  type        String
+  title       String
+  content     String    @db.Text
+  metadataJson Json?    @map("metadata")
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
