@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { UserController } from '@/controllers/user';
 import { requireAuth, requireTaxAccountant } from '@/middleware/auth';
+import { uploadProfileImage, handleUploadError } from '@/middleware/upload';
 import {
   updateProfileValidation,
   updateTaxAccountantValidation,
@@ -15,6 +16,7 @@ const router = Router();
 // User profile routes
 router.get('/profile', requireAuth, UserController.getProfile);
 router.put('/profile', requireAuth, updateProfileValidation, UserController.updateProfile);
+router.post('/profile/image', requireAuth, uploadProfileImage, handleUploadError, UserController.uploadProfileImage);
 router.delete('/account', requireAuth, UserController.deleteAccount);
 
 // Tax accountant specific routes

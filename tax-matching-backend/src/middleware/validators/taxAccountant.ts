@@ -1,4 +1,4 @@
-import { query, param } from 'express-validator';
+import { query, param, body } from 'express-validator';
 
 export const taxAccountantListValidation = [
   query('page')
@@ -89,4 +89,142 @@ export const popularValidation = [
     .optional()
     .isInt({ min: 1, max: 20 })
     .withMessage('Limit must be between 1 and 20'),
+];
+
+export const taxAccountantRegistrationValidation = [
+  body('officeName')
+    .notEmpty()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Office name is required and must be between 1 and 100 characters'),
+  
+  body('licenseNumber')
+    .notEmpty()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('License number is required and must be between 1 and 50 characters'),
+  
+  body('bio')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Bio must not exceed 1000 characters'),
+  
+  body('yearsOfExperience')
+    .notEmpty()
+    .isInt({ min: 0, max: 50 })
+    .withMessage('Years of experience must be between 0 and 50'),
+  
+  body('website')
+    .optional()
+    .isURL()
+    .withMessage('Website must be a valid URL'),
+  
+  body('phoneNumber')
+    .optional()
+    .isLength({ min: 10, max: 15 })
+    .withMessage('Phone number must be between 10 and 15 characters'),
+  
+  body('isAcceptingClients')
+    .optional()
+    .isBoolean()
+    .withMessage('Is accepting clients must be a boolean'),
+  
+  body('specialties')
+    .optional()
+    .isArray()
+    .withMessage('Specialties must be an array'),
+  
+  body('specialties.*.specialtyId')
+    .if(body('specialties').exists())
+    .isUUID()
+    .withMessage('Specialty ID must be a valid UUID'),
+  
+  body('specialties.*.yearsOfExperience')
+    .if(body('specialties').exists())
+    .optional()
+    .isInt({ min: 0, max: 50 })
+    .withMessage('Years of experience must be between 0 and 50'),
+  
+  body('pricingPlans')
+    .optional()
+    .isArray()
+    .withMessage('Pricing plans must be an array'),
+  
+  body('pricingPlans.*.name')
+    .if(body('pricingPlans').exists())
+    .notEmpty()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Plan name is required and must be between 1 and 100 characters'),
+  
+  body('pricingPlans.*.basePrice')
+    .if(body('pricingPlans').exists())
+    .isInt({ min: 0 })
+    .withMessage('Base price must be a non-negative integer'),
+];
+
+export const taxAccountantUpdateValidation = [
+  body('officeName')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Office name must be between 1 and 100 characters'),
+  
+  body('licenseNumber')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('License number must be between 1 and 50 characters'),
+  
+  body('bio')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Bio must not exceed 1000 characters'),
+  
+  body('yearsOfExperience')
+    .optional()
+    .isInt({ min: 0, max: 50 })
+    .withMessage('Years of experience must be between 0 and 50'),
+  
+  body('website')
+    .optional()
+    .isURL()
+    .withMessage('Website must be a valid URL'),
+  
+  body('phoneNumber')
+    .optional()
+    .isLength({ min: 10, max: 15 })
+    .withMessage('Phone number must be between 10 and 15 characters'),
+  
+  body('isAcceptingClients')
+    .optional()
+    .isBoolean()
+    .withMessage('Is accepting clients must be a boolean'),
+  
+  body('specialties')
+    .optional()
+    .isArray()
+    .withMessage('Specialties must be an array'),
+  
+  body('specialties.*.specialtyId')
+    .if(body('specialties').exists())
+    .isUUID()
+    .withMessage('Specialty ID must be a valid UUID'),
+  
+  body('specialties.*.yearsOfExperience')
+    .if(body('specialties').exists())
+    .optional()
+    .isInt({ min: 0, max: 50 })
+    .withMessage('Years of experience must be between 0 and 50'),
+  
+  body('pricingPlans')
+    .optional()
+    .isArray()
+    .withMessage('Pricing plans must be an array'),
+  
+  body('pricingPlans.*.name')
+    .if(body('pricingPlans').exists())
+    .notEmpty()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Plan name is required and must be between 1 and 100 characters'),
+  
+  body('pricingPlans.*.basePrice')
+    .if(body('pricingPlans').exists())
+    .isInt({ min: 0 })
+    .withMessage('Base price must be a non-negative integer'),
 ];

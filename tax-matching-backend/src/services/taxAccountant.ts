@@ -343,4 +343,201 @@ export class TaxAccountantService {
       topSpecialties: topSpecialtiesWithNames,
     };
   }
+
+  static async registerTaxAccountant(userId: string, data: any) {
+    // Check if user exists and has tax_accountant role
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (user.role !== 'tax_accountant') {
+      throw new Error('User must have tax_accountant role');
+    }
+
+    // Check if tax accountant profile already exists
+    const existingTaxAccountant = await prisma.taxAccountant.findUnique({
+      where: { userId },
+    });
+
+    if (existingTaxAccountant) {
+      throw new Error('Tax accountant profile already exists');
+    }
+
+    const {
+      officeName,
+      licenseNumber,
+      bio,
+      yearsOfExperience,
+      website,
+      phoneNumber,
+      isAcceptingClients = true,
+      specialties = [],
+      pricingPlans = [],
+    } = data;
+
+    // Create tax accountant profile
+    const taxAccountant = await prisma.taxAccountant.create({
+      data: {
+        userId,
+        officeName,
+        licenseNumber,
+        bio,
+        yearsOfExperience,
+        website,
+        phoneNumber,
+        isAcceptingClients,
+        averageRating: 0,
+        totalReviews: 0,
+      },
+      include: {
+        user: {
+          include: { profile: true },
+        },
+        specialties: {
+          include: { specialty: true },
+        },
+        pricingPlans: true,
+      },
+    });
+
+    // Add specialties if provided
+    if (specialties.length > 0) {
+      await Promise.all(
+        specialties.map((specialty: any) =>
+          prisma.taxAccountantSpecialty.create({
+            data: {
+              taxAccountantId: taxAccountant.id,
+              specialtyId: specialty.specialtyId,
+              yearsOfExperience: specialty.yearsOfExperience || 0,
+              description: specialty.description,
+            },
+          })
+        )
+      );
+    }
+
+    // Add pricing plans if provided
+    if (pricingPlans.length > 0) {
+      await Promise.all(
+        pricingPlans.map((plan: any, index: number) =>
+          prisma.pricingPlan.create({
+            data: {
+              taxAccountantId: taxAccountant.id,
+              name: plan.name,
+              description: plan.description,
+              basePrice: plan.basePrice,
+              features: plan.features || [],
+              isActive: plan.isActive ?? true,
+              displayOrder: plan.displayOrder ?? index,
+            },
+          })
+        )
+      );
+    }
+
+    // Return the complete tax accountant profile
+    return await this.getTaxAccountantById(taxAccountant.id);
+  }
+
+  static async updateTaxAccountant(userId: string, data: any) {
+    // Check if tax accountant exists for this user
+    const taxAccountant = await prisma.taxAccountant.findUnique({
+      where: { userId },
+      include: {
+        specialties: true,
+        pricingPlans: true,
+      },
+    });
+
+    if (!taxAccountant) {
+      throw new Error('Tax accountant not found');
+    }
+
+    const {
+      officeName,
+      licenseNumber,
+      bio,
+      yearsOfExperience,
+      website,
+      phoneNumber,
+      isAcceptingClients,
+      specialties,
+      pricingPlans,
+    } = data;
+
+    // Update basic profile information
+    const updateData: any = {};
+    if (officeName !== undefined) updateData.officeName = officeName;
+    if (licenseNumber !== undefined) updateData.licenseNumber = licenseNumber;
+    if (bio !== undefined) updateData.bio = bio;
+    if (yearsOfExperience !== undefined) updateData.yearsOfExperience = yearsOfExperience;
+    if (website !== undefined) updateData.website = website;
+    if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+    if (isAcceptingClients !== undefined) updateData.isAcceptingClients = isAcceptingClients;
+
+    if (Object.keys(updateData).length > 0) {
+      await prisma.taxAccountant.update({
+        where: { id: taxAccountant.id },
+        data: updateData,
+      });
+    }
+
+    // Update specialties if provided
+    if (specialties !== undefined) {
+      // Delete existing specialties
+      await prisma.taxAccountantSpecialty.deleteMany({
+        where: { taxAccountantId: taxAccountant.id },
+      });
+
+      // Add new specialties
+      if (specialties.length > 0) {
+        await Promise.all(
+          specialties.map((specialty: any) =>
+            prisma.taxAccountantSpecialty.create({
+              data: {
+                taxAccountantId: taxAccountant.id,
+                specialtyId: specialty.specialtyId,
+                yearsOfExperience: specialty.yearsOfExperience || 0,
+                description: specialty.description,
+              },
+            })
+          )
+        );
+      }
+    }
+
+    // Update pricing plans if provided
+    if (pricingPlans !== undefined) {
+      // Delete existing pricing plans
+      await prisma.pricingPlan.deleteMany({
+        where: { taxAccountantId: taxAccountant.id },
+      });
+
+      // Add new pricing plans
+      if (pricingPlans.length > 0) {
+        await Promise.all(
+          pricingPlans.map((plan: any, index: number) =>
+            prisma.pricingPlan.create({
+              data: {
+                taxAccountantId: taxAccountant.id,
+                name: plan.name,
+                description: plan.description,
+                basePrice: plan.basePrice,
+                features: plan.features || [],
+                isActive: plan.isActive ?? true,
+                displayOrder: plan.displayOrder ?? index,
+              },
+            })
+          )
+        );
+      }
+    }
+
+    // Return the updated tax accountant profile
+    return await this.getTaxAccountantById(taxAccountant.id);
+  }
 }

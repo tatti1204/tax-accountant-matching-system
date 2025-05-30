@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
+import passport from 'passport';
 import { config } from './utils/config';
 import logger from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
@@ -12,6 +14,8 @@ import userRoutes from './routes/user';
 import diagnosisRoutes from './routes/diagnosis';
 import matchingRoutes from './routes/matching';
 import taxAccountantRoutes from './routes/taxAccountant';
+import oauthRoutes from './routes/oauth';
+import { OAuthService } from './services/oauth';
 
 // Create Express app
 const app: Application = express();
@@ -31,9 +35,29 @@ app.use(cors({
 // Compression middleware
 app.use(compression());
 
+// Session middleware (required for OAuth)
+app.use(session({
+  secret: config.security.sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: config.isProduction,
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+OAuthService.initializePassport();
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Static file serving for uploads
+app.use('/uploads', express.static('uploads'));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -65,6 +89,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/diagnosis', diagnosisRoutes);
 app.use('/api/matching', matchingRoutes);
 app.use('/api/tax-accountants', taxAccountantRoutes);
+app.use('/api/oauth', oauthRoutes);
 
 // Default route
 app.get('/', (_req: Request, res: Response) => {

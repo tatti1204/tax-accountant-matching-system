@@ -183,4 +183,96 @@ export class TaxAccountantController {
       });
     }
   }
+
+  static async registerTaxAccountant(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+
+      if (req.user.role !== 'tax_accountant') {
+        res.status(403).json({
+          success: false,
+          message: 'Only users with tax_accountant role can register as tax accountants',
+        });
+        return;
+      }
+
+      const taxAccountantData = req.body;
+      const taxAccountant = await TaxAccountantService.registerTaxAccountant(req.user.userId, taxAccountantData);
+
+      logger.info('Tax accountant registered successfully', { 
+        userId: req.user.userId,
+        taxAccountantId: taxAccountant.id
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Tax accountant registered successfully',
+        data: { taxAccountant },
+      });
+    } catch (error) {
+      logger.error('Tax accountant registration failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId: req.user?.userId 
+      });
+
+      const statusCode = error instanceof Error && error.message.includes('already exists') ? 409 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to register tax accountant',
+      });
+    }
+  }
+
+  static async updateTaxAccountant(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+
+      if (req.user.role !== 'tax_accountant') {
+        res.status(403).json({
+          success: false,
+          message: 'Only tax accountants can update their profile',
+        });
+        return;
+      }
+
+      const updateData = req.body;
+      const taxAccountant = await TaxAccountantService.updateTaxAccountant(req.user.userId, updateData);
+
+      logger.info('Tax accountant updated successfully', { 
+        userId: req.user.userId,
+        taxAccountantId: taxAccountant.id
+      });
+
+      res.json({
+        success: true,
+        message: 'Tax accountant profile updated successfully',
+        data: { taxAccountant },
+      });
+    } catch (error) {
+      logger.error('Tax accountant update failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId: req.user?.userId 
+      });
+
+      const statusCode = error instanceof Error && error.message === 'Tax accountant not found' ? 404 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to update tax accountant',
+      });
+    }
+  }
 }

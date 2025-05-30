@@ -379,6 +379,49 @@ export class UserController {
     }
   }
 
+  static async uploadProfileImage(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated',
+        });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: 'No image file provided',
+        });
+        return;
+      }
+
+      const imageUrl = await UserService.updateProfileImage(req.user.userId, req.file);
+
+      logger.info('Profile image uploaded successfully', { 
+        userId: req.user.userId,
+        filename: req.file.filename
+      });
+
+      res.json({
+        success: true,
+        message: 'Profile image uploaded successfully',
+        data: { imageUrl },
+      });
+    } catch (error) {
+      logger.error('Profile image upload failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId: req.user?.userId 
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload profile image',
+      });
+    }
+  }
+
   static async getSpecialties(_req: Request, res: Response): Promise<void> {
     try {
       const specialties = await UserService.getSpecialties();

@@ -309,6 +309,38 @@ export class UserService {
     return { message: 'Account deactivated successfully' };
   }
 
+  static async updateProfileImage(userId: string, file: Express.Multer.File) {
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Generate image URL (in production, this would be a full URL with domain)
+    const imageUrl = `/uploads/profiles/${file.filename}`;
+
+    // Update or create user profile with new avatar URL
+    await prisma.userProfile.upsert({
+      where: { userId },
+      update: { avatarUrl: imageUrl },
+      create: {
+        userId,
+        avatarUrl: imageUrl,
+      },
+    });
+
+    // TODO: In production, clean up old image file if it exists
+    // if (user.profile?.avatarUrl) {
+    //   cleanupOldProfileImage(path.join(process.cwd(), user.profile.avatarUrl));
+    // }
+
+    return imageUrl;
+  }
+
   static async getSpecialties() {
     const specialties = await prisma.specialty.findMany({
       where: { isActive: true },

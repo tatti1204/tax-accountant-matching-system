@@ -58,3 +58,7 @@ prisma/dev.db*
 
 # Claude
 .claude/
+
+# Git repositories
+tax-accountant-matching/.git/
+tax-matching-backend/.git/
